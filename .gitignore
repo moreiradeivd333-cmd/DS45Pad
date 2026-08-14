@@ -9,12 +9,8 @@ scetool/
 # PS3xPAD reference checkout
 ps3xpad/
 
-# Build artifacts
-src/obj/
-src/*.o
-src/*.prx
-src/*.sym
-src/*.sprx
+#Docs
+docs/
 
 # Keys must never be committed
 keys

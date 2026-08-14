@@ -45,8 +45,8 @@
 #define DS45_UNIT 1024
 
 /* Starting assumption before anything has been learned: a conservative range
- * that suits a short-travel Hall effect module. Real ranges only ever widen
- * from here, and the saturation clamp absorbs the error meanwhile. */
+ * that suits a short-travel Hall effect module. The saturation clamp absorbs
+ * the error meanwhile. */
 #define CAL_DEFAULT_MIN 20
 #define CAL_DEFAULT_MAX 235
 #define CAL_DEFAULT_CTR 128
@@ -76,6 +76,13 @@
 
 static uint32_t save_countdown;
 
+static int clampi(int v, int lo, int hi)
+{
+	if (v < lo) return lo;
+	if (v > hi) return hi;
+	return v;
+}
+
 static void axis_defaults(ds45_axis_cal_t *a)
 {
 	a->min = CAL_DEFAULT_MIN;
@@ -84,6 +91,8 @@ static void axis_defaults(ds45_axis_cal_t *a)
 	a->rest_cand = CAL_DEFAULT_CTR;
 	a->rest_hits = 0;
 	a->centre_budget = CAL_CENTRE_WINDOW_SAMPLES;
+	memset(a->hist, 0, sizeof(a->hist));
+	a->win_count = 0;
 }
 
 /* Both half-spans have to be wide enough to be believable. */
@@ -107,18 +116,111 @@ void sticks_cal_defaults(ds45_stickcal_t *cal)
 /* Learning                                                                  */
 /* ------------------------------------------------------------------------ */
 
-/* Extremes widen by one unit per sample. A stick genuinely held at its stop
- * converges in a fraction of a second; a single noise spike can only ever move
- * the calibration by one, which is below the resolution anyone can feel. */
+/* Extremes are learned from a coarse histogram, one window of samples at a
+ * time. The obvious implementation - widen whenever a sample falls outside the
+ * range - was what this replaces, and it was the cause of a real bug worth
+ * recording, because the symptom pointed nowhere near it.
+ *
+ * That version was a one-way ratchet: min only ever fell, max only ever rose.
+ * So any spurious extreme was permanent. An earlier build had one - a report
+ * that had not been populated read as raw 0 - which dragged the min of every
+ * axis to the rail, one unit per bad sample, while the max sides stayed
+ * honest. Nothing could undo it: recalibrating ran the same one-way code, so
+ * the range stayed too wide for the life of the file.
+ *
+ * The damage then hid in the one place nobody looks. On-axis a too-wide range
+ * is invisible, because the saturation clamp still delivers a solid 0x00/0xFF
+ * either way. On a diagonal nothing clamps - 0.707/0.80 lands at 0.88, mid
+ * scale - so the error appears there and only there. And since each diagonal
+ * is built from a different pair of half-spans, a min-only runaway costs 16%
+ * of reach up-left, 8% on the two sides, and nothing at all down-right: one
+ * specific corner of one stick that will not commit, everything else fine.
+ *
+ * Hence the histogram. At the end of each window, move each extreme part of
+ * the way toward the outermost bucket that was hit often enough to be real.
+ * Two properties are what matter:
+ *
+ *   - a value seen once or twice moves nothing, however extreme, so noise and
+ *     unpopulated reports are ignored rather than believed;
+ *   - the range contracts as readily as it widens, so a stale extreme decays
+ *     on its own instead of outliving the controller.
+ */
+#define CAL_WINDOW    512   /* samples per window - a few seconds of play    */
+#define CAL_CONFIRM     8   /* hits before a bucket is treated as genuine    */
+#define CAL_BUCKETS   DS45_CAL_BUCKETS
+
+/* Move `cur` a fraction of the way toward `est`. Widening is quick, since it
+ * is how a stick's true reach gets discovered; narrowing is eight times slower
+ * so that a few windows of half-hearted stick movement do not visibly retune
+ * the response, while a genuinely wrong extreme still decays away. */
+static int step_toward(int cur, int est, int widening)
+{
+	int d = est - cur;
+
+	if (d > -2 && d < 2)
+		return cur;          /* close enough - do not oscillate forever */
+
+	return cur + (d >> (widening ? 1 : 3));
+}
+
+static void learn_range(ds45_axis_cal_t *c, uint8_t raw, int *dirty)
+{
+	int b, lo = -1, hi = -1, est, now;
+
+	if (c->hist[raw >> 4] < 255)
+		c->hist[raw >> 4]++;
+
+	if (++c->win_count < CAL_WINDOW)
+		return;
+
+	for (b = 0; b < CAL_BUCKETS; b++)
+		if (c->hist[b] >= CAL_CONFIRM) {
+			lo = b;
+			break;
+		}
+
+	for (b = CAL_BUCKETS - 1; b >= 0; b--)
+		if (c->hist[b] >= CAL_CONFIRM) {
+			hi = b;
+			break;
+		}
+
+	/* Each estimate is rounded to the inside of its bucket. Erring inward
+	 * only over-amplifies a little and the clamp absorbs it; erring outward
+	 * is the failure this whole mechanism exists to prevent.
+	 *
+	 * The span guards also stop an idle stick from collapsing the range: with
+	 * the controller at rest every sample lands in the centre bucket, both
+	 * estimates fall inside CAL_MIN_SPAN, and nothing moves. */
+	if (lo >= 0) {
+		est = lo * (256 / CAL_BUCKETS) + (256 / CAL_BUCKETS - 1);
+		if (est <= (int)c->ctr - CAL_MIN_SPAN) {
+			now = step_toward((int)c->min, est, est < (int)c->min);
+			if (now != (int)c->min) {
+				c->min = (uint8_t)clampi(now, 0, 255);
+				*dirty = 1;
+			}
+		}
+	}
+
+	if (hi >= 0) {
+		est = hi * (256 / CAL_BUCKETS);
+		if (est >= (int)c->ctr + CAL_MIN_SPAN) {
+			now = step_toward((int)c->max, est, est > (int)c->max);
+			if (now != (int)c->max) {
+				c->max = (uint8_t)clampi(now, 0, 255);
+				*dirty = 1;
+			}
+		}
+	}
+
+	memset(c->hist, 0, sizeof(c->hist));
+	c->win_count = 0;
+}
+
 static void learn(ds45_axis_cal_t *c, uint8_t raw, int *dirty)
 {
-	if (raw < c->min) {
-		c->min--;
-		*dirty = 1;
-	} else if (raw > c->max) {
-		c->max++;
-		*dirty = 1;
-	}
+	learn_range(c, raw, dirty);
 
 	/* Centre tracking, for sticks that do not rest exactly at 0x80. Runs only
 	 * during the opening window, while the stick can still be assumed to be
@@ -159,13 +261,6 @@ static void learn(ds45_axis_cal_t *c, uint8_t raw, int *dirty)
 /* ------------------------------------------------------------------------ */
 /* Transform                                                                 */
 /* ------------------------------------------------------------------------ */
-
-static int clampi(int v, int lo, int hi)
-{
-	if (v < lo) return lo;
-	if (v > hi) return hi;
-	return v;
-}
 
 /* Bit-by-bit integer square root. The deadzone has to be radial to feel right,
  * and an approximation would show up as the stick reaching the deadzone edge
@@ -287,6 +382,22 @@ void sticks_transform(ds45_pad_t *pad, const ds45_state_t *st,
 	 * calibration; see the note in passthru.c on unpopulated reports. */
 	int learnable = st->sticks_valid ? 1 : 0;
 
+	/* And one more case that check does not catch. A report can be long
+	 * enough to pass the length test and still be a buffer libpad handed back
+	 * without filling in - a pad at rest reads 0x80 on every axis, so all four
+	 * words reading exactly zero is not a stick position, it is an empty
+	 * buffer. Games poll ports that hold no controller, and before this the
+	 * in-game path fed those straight to the learner, where zeros drag every
+	 * min to the rail. That is the runaway that costs reach on the diagonals
+	 * while leaving the pure axes looking perfect.
+	 *
+	 * Correct such a report like any other, but do not learn from it. Nothing
+	 * legitimate is lost: a stick genuinely sweeping to its stop passes
+	 * through 1..15 on the way, and those share a histogram bucket with 0, so
+	 * the real extreme is still discovered. */
+	if (!st->lx && !st->ly && !st->rx && !st->ry)
+		learnable = 0;
+
 	one_stick(pad, DS45_AXIS_LX, DS45_AXIS_LY, st->lx, st->ly, learnable, lx, ly);
 	one_stick(pad, DS45_AXIS_RX, DS45_AXIS_RY, st->rx, st->ry, learnable, rx, ry);
 }
@@ -338,6 +449,9 @@ void sticks_load(void)
 			if (n == 3 && v[0] < v[1] && v[1] < v[2] && v[2] <= 255) {
 				ds45_axis_cal_t a;
 
+				/* Zero first: the histogram and window counter must not
+				 * start from whatever was on the stack. */
+				memset(&a, 0, sizeof(a));
 				a.min = (uint8_t)v[0];
 				a.ctr = (uint8_t)v[1];
 				a.max = (uint8_t)v[2];

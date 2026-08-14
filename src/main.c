@@ -5,9 +5,10 @@
  *
  *   ds45pad_vsh.sprx    loaded by the CFW plugin loader, owns the pad in the
  *                       XMB and keeps owning it while games run
- *   ds45pad_game.sprx   optional, loaded into a game process (PS3MAPI or
- *                       Cobra), adds in-game rumble by detouring
- *                       cellPadSetActDirect - see docs/ARQUITETURA.md
+ *   ds45pad_game.sprx   loaded into a running game process (PS3MAPI or Cobra).
+ *                       Corrects the stick response curve and answers the
+ *                       game's cellPadGetInfo2 - see docs/ARQUITETURA.md.
+ *                       Not a rumble build: rumble is out of scope.
  *
  * Licensed under GPLv2 - see LICENSE.
  */
@@ -219,7 +220,9 @@ static void pads_reset(void)
 
 static void ds45_thread(uint64_t arg)
 {
-#ifndef DS45_GAME
+#ifdef DS45_GAME
+	uint32_t game_tick = 0;
+#else
 	uint32_t since_rescan = 0;
 	uint32_t since_diag = 0;
 	uint32_t uptime = 0;
@@ -261,13 +264,36 @@ static void ds45_thread(uint64_t arg)
 	 * an import of it leaves the loader unable to resolve the module, and
 	 * PS3MAPI just sits there loading forever. */
 	ds45_boot_mark("game_mode");
+
+	/* Slot 0 holds the calibration the game hook corrects against. Claim it:
+	 * sticks_save_if_dirty() only considers slots in use, and in this build
+	 * nothing else ever claims one - there is no USB or Bluetooth attach path
+	 * here - so without this the calibration is learned every session and
+	 * written none of them. */
+	g_pads[0].in_use = 1;
+
 	gamehook_install();
 
 	running = 1;
-	while (running)
+	while (running) {
 		sys_timer_usleep(200 * 1000);
 
+		/* Five ticks to the second, matching what the rate limit inside
+		 * sticks_save_if_dirty() assumes. */
+		if (g_cfg.stick_calibrate && ++game_tick >= 5) {
+			game_tick = 0;
+			sticks_save_if_dirty(0);
+		}
+	}
+
 	gamehook_remove();
+
+	/* Restoring the descriptor does not evict a game thread already executing
+	 * inside the hook, and the module is freed as soon as ds45_stop() returns.
+	 * Without a pause here, unloading the plugin while the game is polling the
+	 * pad can leave a thread running in memory that has just been released. */
+	sys_timer_usleep(300 * 1000);
+
 	if (g_cfg.stick_calibrate)
 		sticks_save_if_dirty(1);
 	sys_ppu_thread_exit(0);
@@ -393,7 +419,15 @@ static void ds45_stop_thread(uint64_t arg)
 	if (thread_id != (sys_ppu_thread_t)-1)
 		sys_ppu_thread_join(thread_id, &exit_code);
 
+#ifndef DS45_GAME
+	/* Never in the game build. ds45_notify() resolves vshtask by walking the
+	 * table at 0x1008C + 0x984, which only *is* an import table in the VSH
+	 * process. In a game process that address holds arbitrary EBOOT data being
+	 * read as import stubs: every pointer taken from it is range checked, but
+	 * a plausible address is not necessarily a mapped one, so the walk can
+	 * fault. A notification cannot reach the screen from a game anyway. */
 	ds45_notify("DS45PAD descarregado");
+#endif
 	sys_ppu_thread_exit(0);
 }
 

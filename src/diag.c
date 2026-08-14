@@ -40,6 +40,30 @@ static int  diag_full;
 static uint16_t last_cooked[DS45_MAX_PORT_NUM][DS45_PAD_LEN];
 static int      seeded[DS45_MAX_PORT_NUM];
 
+/* In the in-game build diag_sticks() runs on the game's own pad-reading
+ * threads, so this buffer has more than one writer - and none of it was written
+ * for that. The index advance in put() is a plain read-modify-write: with three
+ * writers past the bounds check at the same moment, the third stores past the
+ * end of diag_buf, and what lies immediately after it is the very state that
+ * keeps the rest of this file in bounds. commit() is worse, resetting the index
+ * while another thread is mid-write, and doing file I/O on the thread a game
+ * reads input on.
+ *
+ * A try lock, not a blocking one: diagnostics must never stall a game's input
+ * thread, and a dropped log line costs nothing. */
+static volatile uint32_t diag_busy;
+
+static int diag_claim(void)
+{
+	return __sync_bool_compare_and_swap(&diag_busy, 0, 1);
+}
+
+static void diag_release(void)
+{
+	__sync_synchronize();
+	diag_busy = 0;
+}
+
 static void commit(void)
 {
 	int fd;
@@ -117,9 +141,13 @@ static void put_dec(int v)
 
 void diag_msg(const char *msg)
 {
+	if (!diag_claim())
+		return;
+
 	put(msg);
 	put("\n");
 	commit();     /* one-off messages are worth writing straight away */
+	diag_release();
 }
 
 void diag_dump_ports(void)
@@ -131,6 +159,9 @@ void diag_dump_ports(void)
 		diag_msg("cellPadGetInfo2 falhou");
 		return;
 	}
+
+	if (!diag_claim())
+		return;
 
 	put("--- portas ---\n");
 	put("max="); put_dec((int)info.max_connect);
@@ -153,6 +184,7 @@ void diag_dump_ports(void)
 
 	put("\n");
 	commit();
+	diag_release();
 }
 
 static void dump_changes(const char *tag, int port, const CellPadData *data,
@@ -202,6 +234,9 @@ void diag_state(const ds45_pad_t *pad)
 	if (seeded_state[slot] && b == last[slot])
 		return;
 
+	if (!diag_claim())
+		return;
+
 	last[slot] = b;
 	seeded_state[slot] = 1;
 
@@ -214,6 +249,50 @@ void diag_state(const ds45_pad_t *pad)
 	if (b & DS45_B_OPTIONS)  put("  OPTIONS");
 	put("\n");
 	flush();
+	diag_release();
+}
+
+/* Stick sampling.
+ *
+ * Reported symptom this exists for: a small, always-identical sector of one
+ * stick failing while the rest of the travel behaves. Simulation of the
+ * transform found no discontinuity anywhere on the surface, so the answer has
+ * to come from the console: what the source actually reports at that angle,
+ * and what leaves the correction.
+ *
+ * Only near-edge samples are logged, throttled, because that is where the
+ * report is and logging the whole surface would flood the file. */
+#define DIAG_STICK_EDGE   80    /* percent of full travel worth logging */
+#define DIAG_STICK_EVERY  5     /* keep one sample in this many         */
+
+void diag_sticks(uint8_t in_x, uint8_t in_y, uint8_t out_x, uint8_t out_y,
+                 const ds45_axis_cal_t *cx, const ds45_axis_cal_t *cy)
+{
+	static int skip;
+	int dx = (int)in_x - 128;
+	int dy = (int)in_y - 128;
+	int mag2 = dx * dx + dy * dy;
+	int edge = (128 * DIAG_STICK_EDGE) / 100;
+
+	if (mag2 < edge * edge)
+		return;
+	if (!diag_claim())
+		return;
+	if (++skip < DIAG_STICK_EVERY) {
+		diag_release();
+		return;
+	}
+	skip = 0;
+
+	put("stk in=");   put_dec(in_x);  put(",");  put_dec(in_y);
+	put("  out=");    put_dec(out_x); put(",");  put_dec(out_y);
+	put("  calX=");   put_dec(cx->min); put("/"); put_dec(cx->ctr);
+	put("/");         put_dec(cx->max);
+	put("  calY=");   put_dec(cy->min); put("/"); put_dec(cy->ctr);
+	put("/");         put_dec(cy->max);
+	put("\n");
+	flush();
+	diag_release();
 }
 
 void diag_watch(void)
@@ -223,6 +302,9 @@ void diag_watch(void)
 	int port;
 
 	if (cellPadGetInfo2(&info) != CELL_PAD_OK)
+		return;
+
+	if (!diag_claim())
 		return;
 
 	for (port = 0; port < DS45_MAX_PORT_NUM; port++) {
@@ -240,4 +322,5 @@ void diag_watch(void)
 
 		seeded[port] = 1;
 	}
+	diag_release();
 }

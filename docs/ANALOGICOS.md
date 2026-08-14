@@ -92,9 +92,17 @@ joga, e é o que faz a linha "Hall effect" da tabela funcionar.
 
 Como funciona, e por que é seguro:
 
-- Os extremos se alargam **uma unidade por amostra**. Segurando o stick no
-  batente, converge em uma fração de segundo; um pico de ruído isolado move a
-  calibração em exatamente 1, abaixo do que qualquer um percebe.
+- Cada eixo mantém um **histograma** dos valores vistos numa janela de 512
+  amostras. No fim da janela, `min`/`max` andam parte do caminho até o bucket
+  mais extremo que foi atingido pelo menos 8 vezes. Um valor visto uma vez não
+  move nada, por mais extremo que seja.
+- **Alargar é rápido, estreitar é 8× mais lento.** Alargar é como o curso real
+  é descoberto; estreitar devagar evita que algumas janelas de movimento
+  parcial retunem a resposta de forma perceptível, mas garante que um extremo
+  errado decaia sozinho.
+- Com o controle parado, todas as amostras caem no bucket central, as duas
+  estimativas ficam dentro de `CAL_MIN_SPAN` e **nada se move** — deixar o
+  controle na mesa não colapsa a faixa.
 - O centro só é aceito depois de o valor ficar parado por cerca de um segundo,
   **e** só se estiver a menos de 25 unidades de 0x80. Sem essa segunda trava,
   segurar o stick para um lado durante uma partida arrastaria o centro junto.
@@ -102,8 +110,32 @@ Como funciona, e por que é seguro:
   effect. Errar para o lado estreito é inofensivo — o clamp absorve. Errar para
   o lado largo é que impediria alcançar o máximo.
 
-O resultado vai para `ds45pad_cal.txt`, então o primeiro menu depois de um
+O resultado vai para `/dev_hdd0/plugins/ds45pad/ds45pad_cal.txt`, então o primeiro menu depois de um
 reboot já está certo. Girar os dois analógicos uma vez ao ligar acelera tudo.
+
+### Por que não é mais uma catraca
+
+A primeira versão alargava um passo por amostra e **nunca estreitava**. Isso é
+uma catraca de mão única: qualquer extremo espúrio virava permanente, e
+recalibrar rodava o mesmo código de mão única, então não havia como desfazer.
+
+Um build antigo tinha justamente uma fonte de extremos espúrios — um relatório
+não preenchido era lido como raw 0 — o que arrastou o `min` de todos os eixos
+até o trilho, enquanto os `max` continuaram honestos.
+
+O detalhe que fez isso demorar para ser encontrado é **onde o estrago aparece**:
+
+- **Nos eixos puros, é invisível.** O clamp da saturação entrega 0x00/0xFF
+  sólido de qualquer jeito, com faixa certa ou faixa inflada.
+- **Nas diagonais, aparece.** Ali nada clampa (0.707/0.80 = 0.88, meio de
+  escala), então a faixa inflada se traduz direto em menos alcance.
+- E como cada diagonal usa um par diferente de meios-spans, uma fuga só do
+  lado `min` custa **16% de alcance em cima-à-esquerda, 8% nos dois lados, e
+  zero em baixo-à-direita**.
+
+Ou seja: um cantinho específico de um analógico que não fecha, com todo o resto
+perfeito, e imune a recalibração. Foi exatamente esse o relato que levou à
+troca da catraca pelo histograma.
 
 ## Ajuste fino
 
@@ -114,7 +146,7 @@ reboot já está certo. Girar os dois analógicos uma vez ao ligar acelera tudo.
 | Quero o valor cru, sem correção | `STICK_SATURATION = 100` |
 | Analógico anda sozinho | Suba `STICK_DEADZONE` |
 | Hall effect, quero precisão máxima no centro | `STICK_DEADZONE = 0` |
-| Calibração ficou estranha | Apague `ds45pad_cal.txt` e gire os sticks |
+| Calibração ficou estranha | Apague `/dev_hdd0/plugins/ds45pad/ds45pad_cal.txt` e gire os sticks |
 
 `71` merece uma nota: é o valor em que 0,707 / 0,71 ≈ 1, ou seja, a diagonal
 chega ao canto exato (`0x00`/`0xFF`). Um DS3 real **não** faz isso — vai até

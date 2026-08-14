@@ -91,13 +91,20 @@ static int getinfo2_hook(CellPadInfo2 *info)
 /* Apply the response curve to the stick words of a report the game is about to
  * receive. Calibration lives in slot 0; there is only ever one pad being
  * corrected here. */
-static void correct_sticks(CellPadData *data)
+static void correct_sticks(uint32_t port_no, CellPadData *data)
 {
+	ds45_pad_t *pad;
 	ds45_state_t st;
 	uint8_t lx, ly, rx, ry;
 
 	if (!data || data->len <= DS45_BTN_ANALOG_LEFT_Y)
 		return;
+
+	/* One calibration per port, not one shared by every port. Two controllers
+	 * with different stick hardware would otherwise teach the same min/max,
+	 * and the learned range would converge on the union of the two - which is
+	 * precisely the too-wide range that costs reach on the diagonals. */
+	pad = &g_pads[port_no < DS45_MAX_PADS ? port_no : 0];
 
 	memset(&st, 0, sizeof(st));
 	st.lx = (uint8_t)data->button[DS45_BTN_ANALOG_LEFT_X];
@@ -107,12 +114,19 @@ static void correct_sticks(CellPadData *data)
 	st.valid = 1;
 	st.sticks_valid = 1;
 
-	sticks_transform(&g_pads[0], &st, &lx, &ly, &rx, &ry);
+	sticks_transform(pad, &st, &lx, &ly, &rx, &ry);
 
 	data->button[DS45_BTN_ANALOG_LEFT_X]  = lx;
 	data->button[DS45_BTN_ANALOG_LEFT_Y]  = ly;
 	data->button[DS45_BTN_ANALOG_RIGHT_X] = rx;
 	data->button[DS45_BTN_ANALOG_RIGHT_Y] = ry;
+
+	/* Right stick only: that is where the reported dead sector is, and
+	 * logging both would halve the useful sample rate for no reason. */
+	if (g_cfg.diag)
+		diag_sticks(st.rx, st.ry, rx, ry,
+		            &pad->cal.axis[DS45_AXIS_RX],
+		            &pad->cal.axis[DS45_AXIS_RY]);
 }
 
 static int getdata_hook(uint32_t port_no, CellPadData *data)
@@ -126,7 +140,7 @@ static int getdata_hook(uint32_t port_no, CellPadData *data)
 
 	r = orig(port_no, data);
 	if (r == CELL_PAD_OK)
-		correct_sticks(data);
+		correct_sticks(port_no, data);
 
 	return r;
 }
@@ -144,7 +158,7 @@ static int getdataextra_hook(uint32_t port_no, uint32_t *device_type,
 
 	r = orig(port_no, device_type, data);
 	if (r == CELL_PAD_OK)
-		correct_sticks(data);
+		correct_sticks(port_no, data);
 
 	return r;
 }

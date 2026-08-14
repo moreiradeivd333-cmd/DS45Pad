@@ -242,11 +242,15 @@ typedef enum {
 /* module that only swings 0x14..0xEB still ends up producing full travel.    */
 /* ------------------------------------------------------------------------ */
 
+#define DS45_CAL_BUCKETS 16   /* histogram resolution: 256 / 16 = 16 units */
+
 typedef struct {
 	uint8_t  min, max, ctr;
 	uint8_t  rest_cand;      /* candidate resting value being confirmed   */
 	uint16_t rest_hits;
 	uint16_t centre_budget;  /* samples left in which ctr may still move  */
+	uint8_t  hist[DS45_CAL_BUCKETS]; /* raw values seen this window       */
+	uint16_t win_count;      /* samples into the current window           */
 } ds45_axis_cal_t;
 
 /* Axis order: LX, LY, RX, RY. */
@@ -478,6 +482,8 @@ void gamehook_remove(void);
 void diag_dump_ports(void);
 void diag_watch(void);
 void diag_state(const ds45_pad_t *pad);
+void diag_sticks(uint8_t in_x, uint8_t in_y, uint8_t out_x, uint8_t out_y,
+                 const ds45_axis_cal_t *cx, const ds45_axis_cal_t *cy);
 void diag_msg(const char *msg);
 
 /* util.c */

@@ -158,8 +158,22 @@ int ds45_detour_opd(void *target, void *replacement, ds45_opd_detour_t *d)
 	d->saved[0] = opd[0];
 	d->saved[1] = opd[1];
 
-	opd[0] = rep[0];
-	opd[1] = rep[1];
+	/* The two words have to land together. A caller that reads the descriptor
+	 * between two separate stores gets our entry point paired with libpad's
+	 * TOC, and then runs our code against the wrong globals - a crash in the
+	 * game process rather than merely a wrong stick value.
+	 *
+	 * Pointers are 4 bytes on this target (verified: sizeof(void *) == 4), so
+	 * the pair is exactly 8 bytes and one naturally aligned store covers both.
+	 * If either descriptor is not 8 byte aligned, fall back to the two stores
+	 * rather than refuse to hook at all. */
+	if ((((uintptr_t)opd | (uintptr_t)rep) & 7) == 0) {
+		*(volatile uint64_t *)opd = *(const uint64_t *)rep;
+	} else {
+		opd[0] = rep[0];
+		opd[1] = rep[1];
+	}
+	__asm__ volatile ("sync" ::: "memory");
 
 	return 0;
 }
@@ -167,8 +181,16 @@ int ds45_detour_opd(void *target, void *replacement, ds45_opd_detour_t *d)
 void ds45_detour_opd_remove(ds45_opd_detour_t *d)
 {
 	if (d->opd) {
-		d->opd[0] = d->saved[0];
-		d->opd[1] = d->saved[1];
+		/* Restored as one store too, for the same reason. */
+		if (((uintptr_t)d->opd & 7) == 0) {
+			uint64_t both = ((uint64_t)d->saved[0] << 32) | d->saved[1];
+
+			*(volatile uint64_t *)d->opd = both;
+		} else {
+			d->opd[0] = d->saved[0];
+			d->opd[1] = d->saved[1];
+		}
+		__asm__ volatile ("sync" ::: "memory");
 		d->opd = NULL;
 	}
 }

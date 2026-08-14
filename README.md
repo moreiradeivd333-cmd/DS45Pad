@@ -6,8 +6,6 @@ response to match a real DS3.
 
 Works on **PS3HEN** and **CFW**. No hardware adapter required.
 
-> 🇧🇷 [Leia em português](README.pt-BR.md) — the `docs/` folder is in Portuguese.
-
 ---
 
 ## The problem
@@ -61,19 +59,6 @@ Because it never touches device identity, it works over **any** controller the
 game already receives — DualSense, DS4, an adapter, even a real DualShock 3
 whose sticks you want re-curved.
 
-### Measured results
-
-Full diagonal, pushed to the stop:
-
-| Controller | Raw | Corrected | Real DualShock 3 |
-|---|---|---|---|
-| DS4 / DualSense, stock sticks | `0x25` | **`0x0E`** | `0x0F` |
-| Hall effect module | `0x25` | **`0x0F`** | `0x0F` |
-| Worn / reduced-range stick | `0x26` | **`0x10`** | `0x0F` |
-
-After calibration, a Hall effect stick produces the same numbers as a stock one.
-The hardware difference disappears.
-
 ---
 
 ## What works
@@ -86,11 +71,6 @@ The hardware difference disappears.
 | PS button in the XMB | ✅ with the optional VSH module |
 | PS button **in-game** | ❌ handled by the VSH, not the game — out of reach |
 | Rumble, sixaxis, touchpad | ❌ not implemented on this path |
-
-Tested on PS3HEN with a DualSense and *God of War II HD*.
-
-To exit a game without a working PS button: webMAN in a browser → **PS3MAPI**
-tab → **Exit**.
 
 ---
 
@@ -144,9 +124,7 @@ Fallback with no USB stick: Recovery Menu → **Rebuild Database**, which delete
 Transfer over FTP (webMAN's server, port 21, blank credentials) or with a USB
 stick and a file manager.
 
-> **FileZilla tip:** use Site Manager rather than Quickconnect, set transfer mode
-> to **Active**, limit simultaneous connections to **1**, and set the charset to
-> ISO-8859-1. Windows Explorer (`ftp://<ps3-ip>`) also works and needs no setup.
+> Windows Explorer (`ftp://<ps3-ip>`) also works and needs no setup.
 
 ### 4. Register the boot plugins
 
@@ -158,8 +136,7 @@ Add to `/dev_hdd0/boot_plugins.txt` — one path per line, in the **root** of
 /dev_hdd0/plugins/ds45pad/ds45pad_vsh.sprx
 ```
 
-The second line is optional and only provides the PS button in the XMB. If you
-do not care about that, leave it out — fewer moving parts.
+**The second line is optional and only provides the PS button in the XMB. If you do not care about that, leave it out — fewer moving parts.**
 
 On MAMBA setups the file is called `mamba_plugins.txt`.
 
@@ -198,7 +175,7 @@ force it to re-check.
 
 Rotate both sticks to their stops a few times. This teaches the plugin each
 axis's real range and is what makes a short-travel Hall effect module reach full
-scale. It is saved to `ds45pad_cal.txt` and does not need repeating.
+scale. It is saved to `/dev_hdd0/plugins/ds45pad/ds45pad_cal.txt` — the same folder as the SPRX files — and does not need repeating.
 
 ---
 
@@ -306,7 +283,6 @@ More detail in [docs/PESQUISA.md](docs/PESQUISA.md) (Portuguese).
 src/          plugin sources + build script
 data/         default configuration files
 release/      built, signed .sprx ready to install
-docs/         detailed documentation (Portuguese)
 ```
 
 ---
@@ -325,10 +301,3 @@ docs/         detailed documentation (Portuguese)
 - **[webMAN MOD](https://github.com/aldostools/webMAN-MOD)** by aldostools —
   PS3MAPI, without which loading a module into a game process would not be
   possible.
-
-## License
-
-GPLv2 — see [LICENSE](LICENSE).
-
-PlayStation, DualShock and DualSense are trademarks of Sony Interactive
-Entertainment. This project is not affiliated with or endorsed by Sony.

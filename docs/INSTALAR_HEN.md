@@ -217,7 +217,7 @@ batente**, fazendo círculos completos.
 
 Isso ensina ao plugin o curso real de cada eixo. É o que faz um stick Hall
 effect — que muitas vezes só vai de `0x14` a `0xEB` — alcançar o extremo. O
-resultado fica salvo em `ds45pad_cal.txt` e não precisa ser refeito.
+resultado fica salvo em `/dev_hdd0/plugins/ds45pad/ds45pad_cal.txt` e não precisa ser refeito.
 
 Depois teste num jogo. Se ainda faltar alcance nos cantos, abra
 `ds45pad.txt` e baixe:

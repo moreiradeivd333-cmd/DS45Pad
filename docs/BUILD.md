@@ -49,18 +49,31 @@ esse passo por você.
 
 ## Compilando
 
+O caminho testado é o `build.sh`, e é o que você deve usar:
+
 ```bash
 cd src
-make            # ds45pad_vsh.sprx
+./build.sh        # ds45pad_vsh.sprx
 ```
-
-Para gerar também o build de jogo (vibração em jogo):
 
 ```bash
-make all-builds # ds45pad_vsh.sprx + ds45pad_game.sprx
+cd src
+./build.sh game   # ds45pad_game.sprx
 ```
 
-O build de jogo é o mesmo código com `-DDS45_GAME`.
+Ele não usa GNU make de propósito — veja [COMPILAR.md](COMPILAR.md) para o
+motivo. Os dois builds **não** compartilham lista de fontes, de bibliotecas nem
+auth-id, e o script verifica que a saída começa com `SCE` antes de terminar.
+
+O `Makefile` continua no repositório para quem tem um ambiente SDK completo
+(`make`, `make game`, `make all-builds`), com os mesmos alvos separados. Ele não
+é o caminho verificado aqui: se `make` e `build.sh` divergirem, o `build.sh`
+está certo.
+
+O build de jogo é o mesmo código com `-DDS45_GAME`. Ele não é a versão "com
+vibração" — vibração saiu do escopo. É o build que se injeta num jogo em
+execução para corrigir a curva dos analógicos e responder ao
+`cellPadGetInfo2` do jogo; veja [ARQUITETURA.md](ARQUITETURA.md).
 
 ## Assinatura
 
