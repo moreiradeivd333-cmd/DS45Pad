@@ -1,0 +1,37 @@
+DS45PAD is licensed under the GNU General Public License, version 2.
+
+    This program is free software; you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by the Free
+    Software Foundation; either version 2 of the License, or (at your option)
+    any later version.
+
+    This program is distributed in the hope that it will be useful, but
+    WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+    or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+Full licence text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.txt
+
+---
+
+Attribution
+
+All code in src/ was written for this project. Two GPLv2 works were used as
+technical references and shaped the design; GPLv2 is chosen for compatibility
+with them:
+
+  * PS3xPAD by OsirisX - https://github.com/aldostools/PS3xPAD
+    Source of the libpad LDD approach: syscalls 573/574 for registering a
+    virtual controller with custom capabilities, and CELL_PAD_CTRL_LDD_PS as
+    the carrier for the PS button.
+
+  * Linux hid-playstation driver
+    https://github.com/torvalds/linux/blob/master/drivers/hid/hid-playstation.c
+    Reference for the DualShock 4 and DualSense HID report layouts, report
+    ids, Bluetooth output CRC32 seeding and sensor resolutions.
+
+RPCS3 (GPLv2) was consulted for the exact numeric values of the cellPad
+constants: https://github.com/RPCS3/rpcs3
+
+PlayStation, DualShock and DualSense are trademarks of Sony Interactive
+Entertainment. This project is not affiliated with or endorsed by Sony.

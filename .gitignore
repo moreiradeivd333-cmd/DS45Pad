@@ -1,0 +1,32 @@
+# Sony's SDK - proprietary, must never be committed
+PS3 4.75 SDK Offline Installer/
+*.SDK/
+cell/
+
+# scetool is someone else's repository; clone it separately
+scetool/
+
+# PS3xPAD reference checkout
+ps3xpad/
+
+# Build artifacts
+src/obj/
+src/*.o
+src/*.prx
+src/*.sym
+src/*.sprx
+
+# Keys must never be committed
+keys
+data/keys
+*.dat
+
+# Runtime files produced on the console
+ds45pad_cal.txt
+ds45pad_boot.txt
+ds45pad_diag.txt
+
+# OS noise
+Thumbs.db
+desktop.ini
+.DS_Store

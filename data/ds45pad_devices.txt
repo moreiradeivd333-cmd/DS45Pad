@@ -1,0 +1,22 @@
+# =============================================================================
+# DS45PAD - controles reconhecidos por USB
+# Local no console: /dev_hdd0/plugins/ds45pad/ds45pad_devices.txt
+#
+# Os controles oficiais ja vem embutidos no plugin; este arquivo existe para
+# adicionar clones e revisoes novas sem recompilar nada.
+#
+# Formato, um por linha:   VID, PID, MODELO
+# MODELO: DS4 ou DUALSENSE (define qual parser de relatorio HID sera usado)
+#
+# Para descobrir o VID/PID de um controle, ligue DIAG = 1 no ds45pad.txt.
+# Limite de 16 dispositivos no total.
+# =============================================================================
+
+# Ja embutidos, listados aqui apenas como referencia:
+#   0x054c, 0x05c4, DS4          DualShock 4 (CUH-ZCT1)
+#   0x054c, 0x09cc, DS4          DualShock 4 (CUH-ZCT2)
+#   0x054c, 0x0ba0, DS4          Adaptador USB sem fio do DualShock 4
+#   0x054c, 0x0ce6, DUALSENSE    DualSense
+#   0x054c, 0x0df2, DUALSENSE    DualSense Edge
+
+# Adicione os seus abaixo:

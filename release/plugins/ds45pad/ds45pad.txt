@@ -1,0 +1,98 @@
+# DS45PAD - configuracao
+# Local no console: /dev_hdd0/plugins/ds45pad/ds45pad.txt
+#
+# CHAVE = VALOR, uma por linha. '#' comenta.
+# As explicacoes longas ficam em docs/ - este arquivo e proposital curto:
+# uma versao anterior cresceu tanto que estourou o buffer do parser e 34 das
+# 39 chaves passaram a ser ignoradas em silencio.
+
+# --- conexao -----------------------------------------------------------------
+# BT   = passthrough sobre o pad que o firmware ja publicou  <- use este
+# USB  = driver USB proprio (nao funciona com DualSense neste firmware)
+# AUTO = tenta USB, cai para passthrough
+MODE = BT
+
+# Porta do pad de origem no passthrough. -1 = descobre sozinho.
+BT_SOURCE_PORT = -1
+
+# Limite de pads virtuais.
+MAX_PADS = 1
+
+# Periodo de leitura em ms.
+POLL_MS = 10
+
+# --- analogicos --------------------------------------------------------------
+# Curva de resposta. 80 = igual a um DualShock 3. 100 = cru (sem correcao).
+# 71 = diagonais chegam ao canto absoluto. Detalhes em docs/ANALOGICOS.md
+STICK_SATURATION = 80
+
+# Zona morta central, % do curso.
+STICK_DEADZONE = 4
+
+# Aprende o curso real de cada eixo (AUTO) ou usa valores fixos (OFF).
+STICK_CALIBRATION = AUTO
+
+# --- compatibilidade ---------------------------------------------------------
+# Capacidades anunciadas. 0x1F = tudo; tente 0xFFFF se um jogo recusar.
+CAPABILITY_MASK = 0x1F
+CAPABILITY_SHIFT = 1
+
+# Tipo do pad virtual. 5 = LDD (padrao), 0 = STANDARD como um DualShock 3.
+# Tente 0 se um jogo exigir controle oficial e recusar mesmo assim.
+LDD_DEV_TYPE = 5
+
+# Expor o pad virtual aos jogos. DEIXE 0.
+#
+# Nao e mais necessario: a compatibilidade com jogos vem do ds45pad_game.sprx,
+# que responde cellPadGetInfo2 de dentro do processo. E ligar isso impede
+# qualquer app iniciado depois (multiMAN incluido) de terminar de carregar.
+#
+# Se ainda quiser experimentar, a combinacao OPTIONS + CREATE + R3 liga em jogo.
+INSERT_INTO_GAME = 0
+
+# --- somente para o ds45pad_game.sprx (carregado no processo do jogo) --------
+# Responde cellPadGetInfo2 como um DualShock 3 conformante, de dentro do jogo.
+# E o que faz um jogo que exige controle oficial aceitar o que estiver plugado -
+# sem adaptador. Desligue (0) se algum jogo se comportar de forma estranha.
+SPOOF_PAD_INFO = 1
+
+# --- botao PS ----------------------------------------------------------------
+# Onde o botao PS aparece no relatorio do driver generico. -1 = nao reportado.
+# Descubra com DIAG = 1; veja docs/DIAGNOSTICO.md
+BT_PS_CODE = -1
+BT_PS_MASK = 0
+
+# Combinacao substituta: NONE | SELECT_START | L3_R3
+BT_PS_COMBO = SELECT_START
+
+# --- desligados --------------------------------------------------------------
+RUMBLE = 0
+SIXAXIS = 0
+ACCEL_SCALE = 100
+GYRO_SCALE = 100
+INVERT_X = 0
+INVERT_Y = 0
+INVERT_Z = 0
+INVERT_G = 0
+SWAP_XY = 0
+TOUCHPAD_MODE = OFF
+MAP_TOUCHPAD = NONE
+MAP_TOUCH_LEFT = NONE
+MAP_TOUCH_RIGHT = NONE
+MAP_MUTE = NONE
+MAP_FN_L = NONE
+MAP_FN_R = NONE
+MAP_PADDLE_L = L1
+MAP_PADDLE_R = R1
+PRESSURE = DIGITAL
+PRESSURE_RAMP_MS = 200
+
+# --- luzes -------------------------------------------------------------------
+LIGHTBAR = 1
+DIM_LIGHTBAR = 1
+
+# --- chaves de servico -------------------------------------------------------
+# ENABLE = 0 carrega o plugin e nao faz mais nada (linha de base de teste).
+ENABLE = 1
+DIAG = 0
+NOTIFY = 0
