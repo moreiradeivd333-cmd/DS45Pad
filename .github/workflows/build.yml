@@ -24,6 +24,7 @@ jobs:
 
           python3 -c '
           open("/tmp/inc/cell/pad.h","w").write("""#include <stdint.h>
+          #define CELL_OK 0
           #define CELL_PAD_OK 0
           #define CELL_PAD_MAX_PORT_NUM 7
           #define CELL_PAD_MAX_CODES 64
@@ -56,7 +57,7 @@ jobs:
           printf '#include <stdint.h>\ntypedef uint32_t sys_mutex_t;\ntypedef struct { uint32_t attr_protocol, attr_recursive, attr_pshared, attr_adaptive; uint64_t key; int32_t flags; uint32_t pad; char name; } sys_mutex_attribute_t;\ntypedef struct { uint64_t lock_var; uint32_t attribute, recursive_count, sleep_queue, pad; } sys_lwmutex_t;\ntypedef struct { uint32_t attr_protocol, attr_recursive; char name; } sys_lwmutex_attribute_t;\n#define SYS_SYNC_PRIORITY 1\n#define SYS_SYNC_NOT_RECURSIVE 0x20\n#define SYS_SYNC_RECURSIVE 0x10\n#define sys_mutex_attribute_initialize(a) do { (a).attr_protocol=1; (a).attr_recursive=0x20; } while(0)\n#define sys_lwmutex_attribute_initialize(a) do { (a).attr_protocol=1; (a).attr_recursive=0x20; } while(0)\nint sys_mutex_create(sys_mutex_t*, const sys_mutex_attribute_t*);\nint sys_mutex_destroy(sys_mutex_t*);\nint sys_mutex_lock(sys_mutex_t, uint64_t);\nint sys_mutex_unlock(sys_mutex_t);\nint sys_lwmutex_create(sys_lwmutex_t*, const sys_lwmutex_attribute_t*);\nint sys_lwmutex_destroy(sys_lwmutex_t*);\nint sys_lwmutex_lock(sys_lwmutex_t*, uint64_t);\nint sys_lwmutex_unlock(sys_lwmutex_t*);\n' > /tmp/inc/sys/synchronization.h
 
           cd src
-          powerpc64-ps3-elf-gcc -O2 -m32 -w -ffunction-sections -fdata-sections -nostartfiles -nodefaultlibs -std=gnu99 -I. -I/tmp/inc -I$PS3DEV/ppu/include -L$PS3DEV/ppu/lib -Wl,--gc-sections -Wl,--unresolved-symbols=ignore-all -o ds45pad_vsh.elf libc.c util.c hook.c config.c ds4.c dualsense.c gamehook.c usb.c passthru.c diag.c main.c
+          powerpc64-ps3-elf-gcc -O2 -m32 -w -DCELL_OK=0 -ffunction-sections -fdata-sections -nostartfiles -nodefaultlibs -std=gnu99 -I. -I/tmp/inc -I$PS3DEV/ppu/include -L$PS3DEV/ppu/lib -Wl,--gc-sections -Wl,--unresolved-symbols=ignore-all -o ds45pad_vsh.elf libc.c util.c hook.c config.c ds4.c dualsense.c gamehook.c usb.c passthru.c diag.c main.c
           sprxlinker ds45pad_vsh.elf || true
           make_self ds45pad_vsh.elf ds45pad_vsh.sprx || fself ds45pad_vsh.elf ds45pad_vsh.sprx || true
           ls -la
