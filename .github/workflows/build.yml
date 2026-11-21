@@ -14,18 +14,17 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Instalar dependencias 32-bit e ferramentas
+      - name: Baixar PS3 Dev Tools (PPU + PRX + scetool)
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
           sudo apt-get install -y build-essential git wget unzip p7zip-full libc6:i386 libstdc++6:i386 zlib1g:i386 libssl-dev libgmp-dev
+          mkdir -p /tmp/ps3tools
+          wget -q https://github.com -O /tmp/ps3dev.tar.gz
+          tar -xzf /tmp/ps3dev.tar.gz -C /tmp/ps3tools
+          ls -la /tmp/ps3tools/ps3dev/bin /tmp/ps3tools/ps3dev/ppu/bin || find /tmp/ps3tools -maxdepth 3
 
-      - name: Baixar CELL_SDK e scetool
+      - name: Verificar arquivos e chaves do projeto
         run: |
-          mkdir -p /tmp/sdk
-          git clone --depth 1 https://github.com /tmp/sdk/ps3sdk || true
-          ls -la /tmp/sdk/ps3sdk/ || true
-
-      - name: Verificar estrutura do SDK
-        run: |
-          find /tmp/sdk -maxdepth 3
+          ls -la data/ || true
+          ls -la release/ || true
