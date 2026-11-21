@@ -16,25 +16,6 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Compilar e Assinar DS45Pad (VSH e GAME)
+      - name: Listar includes do projeto
         run: |
-          export PS3DEV=/usr/local/ps3dev
-          export PSL1GHT=$PS3DEV
-          export PATH=$PATH:$PS3DEV/bin:$PS3DEV/ppu/bin
-          cd src
-
-          CFLAGS="-Os -ffunction-sections -fdata-sections -nodefaultlibs -std=gnu99 -Wall -Wno-unused-function -I. -I$PS3DEV/ppu/include -I$PSL1GHT/ppu/include"
-          LDFLAGS="-L$PS3DEV/ppu/lib -L$PSL1GHT/ppu/lib -Wl,--gc-sections -Wl,--strip-unused-data"
-
-          echo "=== Compilando VSH (com Sixaxis Emu) ==="
-          powerpc64-ps3-elf-gcc $CFLAGS $LDFLAGS -o ds45pad_vsh.elf libc.c util.c hook.c config.c ds4.c dualsense.c gamehook.c usb.c passthru.c diag.c main.c -lusbd_stub -lio_stub -lfs_stub -lsysmodule_stub -lsysutil_stub || true
-          ls -la
-
-      - name: Enviar arquivos gerados
-        uses: actions/upload-artifact@v4
-        with:
-          name: DS45Pad-SixaxisMod
-          path: |
-            src/*.elf
-            src/*.sprx
-          if-no-files-found: warn
+          grep -rn "#include" src/
