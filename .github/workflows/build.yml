@@ -1,7 +1,11 @@
-      - '.github/workflows/**'
+name: Build DS45Pad PS3HEN
 
-jobs:
-  build:
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+build:
     runs-on: ubuntu-latest
     container:
       image: hldtux/ps3dev:latest
