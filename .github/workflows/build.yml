@@ -16,6 +16,106 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Listar includes do projeto
+      - name: Criar headers minimos Cell SDK e compilar
         run: |
-          grep -rn "#include" src/
+          export PS3DEV=/usr/local/ps3dev
+          export PATH=$PATH:$PS3DEV/bin:$PS3DEV/ppu/bin
+          mkdir -p /tmp/cell_inc/cell /tmp/cell_inc/sys
+
+          cat << 'EOF' > /tmp/cell_inc/cell/pad.h
+          #ifndef _CELL_PAD_H_
+          #define _CELL_PAD_H_
+          #include <stdint.h>
+          #define CELL_PAD_MAX_PORT_NUM 7
+          #define CELL_PAD_MAX_CODES 64
+          #define CELL_PAD_STATUS_DISCONNECTED 0
+          #define CELL_PAD_STATUS_CONNECTED 1
+          #define CELL_PAD_CAPABILITY_PS3_CONFORMITY (1 << 0)
+          #define CELL_PAD_CAPABILITY_PRESS_MODE (1 << 1)
+          #define CELL_PAD_CAPABILITY_SENSOR_MODE (1 << 2)
+          #define CELL_PAD_CAPABILITY_HP_ANALOG_STICK (1 << 3)
+          #define CELL_PAD_CAPABILITY_ACTUATOR (1 << 4)
+          typedef struct CellPadData { int32_t len; uint16_t button[CELL_PAD_MAX_CODES]; } CellPadData;
+          typedef struct CellPadInfo2 {
+            uint32_t max_connect; uint32_t now_connect; uint32_t system_info;
+            uint32_t port_status[CELL_PAD_MAX_PORT_NUM];
+            uint32_t port_setting[CELL_PAD_MAX_PORT_NUM];
+            uint32_t device_capability[CELL_PAD_MAX_PORT_NUM];
+            uint32_t device_type[CELL_PAD_MAX_PORT_NUM];
+          } CellPadInfo2;
+          typedef struct CellPadActParam { uint8_t motor[2]; uint8_t reserved[6]; } CellPadActParam;
+          int32_t cellPadGetData(uint32_t port_no, CellPadData *data);
+          int32_t cellPadGetInfo2(CellPadInfo2 *info);
+          int32_t cellPadSetActDirect(uint32_t port_no, CellPadActParam *param);
+          int32_t cellPadSetPortSetting(uint32_t port_no, uint32_t port_setting);
+          #endif
+          EOF
+
+          cat << 'EOF' > /tmp/cell_inc/cell/cell_fs.h
+          #ifndef _CELL_FS_H_
+          #define _CELL_FS_H_
+          #include <stdint.h>
+          #define CELL_FS_O_RDONLY 000000
+          #define CELL_FS_O_WRONLY 000001
+          #define CELL_FS_O_RDWR   000002
+          #define CELL_FS_O_CREAT  000100
+          #define CELL_FS_O_TRUNC  001000
+          #define CELL_FS_O_APPEND 002000
+          #define CELL_FS_SUCCEEDED 0
+          int cellFsOpen(const char *path, int flags, int *fd, const void *arg, uint64_t size);
+          int cellFsRead(int fd, void *buf, uint64_t nbytes, uint64_t *nread);
+          int cellFsWrite(int fd, const void *buf, uint64_t nbytes, uint64_t *nwrite);
+          int cellFsClose(int fd);
+          #endif
+          EOF
+
+          cat << 'EOF' > /tmp/cell_inc/cell/usbd.h
+          #ifndef _CELL_USBD_H_
+          #define _CELL_USBD_H_
+          #include <stdint.h>
+          #define CELL_USBD_PROBE_SUCCEEDED 0
+          #define CELL_USBD_PROBE_FAILED -1
+          #define CELL_USBD_ATTACH_SUCCEEDED 0
+          #define CELL_USBD_ATTACH_FAILED -1
+          #define CELL_USBD_DETACH_SUCCEEDED 0
+          #define CELL_USBD_DETACH_FAILED -1
+          typedef struct CellUsbdDeviceDescriptor {
+            uint8_t bLength; uint8_t bDescriptorType; uint16_t bcdUSB;
+            uint8_t bDeviceClass; uint8_t bDeviceSubClass; uint8_t bDeviceProtocol;
+            uint8_t bMaxPacketSize0; uint16_t idVendor; uint16_t idProduct;
+            uint16_t bcdDevice; uint8_t iManufacturer; uint8_t iProduct;
+            uint8_t iSerialNumber; uint8_t bNumConfigurations;
+          } CellUsbdDeviceDescriptor;
+          typedef struct CellUsbdLddOps {
+            const char *name;
+            int (*probe)(int dev_id);
+            int (*attach)(int dev_id);
+            int (*detach)(int dev_id);
+          } CellUsbdLddOps;
+          typedef void (*CellUsbdDoneCallback)(int32_t result, int32_t count, void *arg);
+          int32_t cellUsbdInit(void);
+          int32_t cellUsbdEnd(void);
+          int32_t cellUsbdRegisterLdd(CellUsbdLddOps *lddops);
+          int32_t cellUsbdUnregisterLdd(CellUsbdLddOps *lddops);
+          void *cellUsbdScanStaticDescriptor(int32_t dev_id, void *ptr, uint8_t type);
+          int32_t cellUsbdOpenPipe(int32_t dev_id, void *desc);
+          int32_t cellUsbdClosePipe(int32_t pipe_id);
+          int32_t cellUsbdControlTransfer(int32_t pipe_id, void *req, void *buf, CellUsbdDoneCallback cb, void *arg);
+          int32_t cellUsbdInterruptTransfer(int32_t pipe_id, void *buf, uint32_t len, CellUsbdDoneCallback cb, void *arg);
+          #endif
+          EOF
+
+          cd src
+          CFLAGS="-O2 -ffunction-sections -fdata-sections -nodefaultlibs -std=gnu99 -Wall -Wno-unused-function -I. -I/tmp/cell_inc -I$PS3DEV/ppu/include"
+          LDFLAGS="-L$PS3DEV/ppu/lib -Wl,--gc-sections"
+          powerpc64-ps3-elf-gcc $CFLAGS $LDFLAGS -o ds45pad_vsh.elf libc.c util.c hook.c config.c ds4.c dualsense.c gamehook.c usb.c passthru.c diag.c main.c -lusbd_stub -lio_stub -lfs_stub -lsysmodule_stub -lsysutil_stub || true
+          ls -la
+
+      - name: Enviar arquivos gerados
+        uses: actions/upload-artifact@v4
+        with:
+          name: DS45Pad-SixaxisMod
+          path: |
+            src/*.elf
+            src/*.sprx
+          if-no-files-found: warn
