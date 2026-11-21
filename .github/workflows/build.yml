@@ -10,21 +10,15 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: hldtux/ps3dev:latest
     steps:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Baixar PS3 Dev Tools (PPU + PRX + scetool)
+      - name: Compilar oscetool e verificar compilador PPU
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y build-essential git wget unzip p7zip-full libc6:i386 libstdc++6:i386 zlib1g:i386 libssl-dev libgmp-dev
-          mkdir -p /tmp/ps3tools
-          wget -q https://github.com -O /tmp/ps3dev.tar.gz
-          tar -xzf /tmp/ps3dev.tar.gz -C /tmp/ps3tools
-          ls -la /tmp/ps3tools/ps3dev/bin /tmp/ps3tools/ps3dev/ppu/bin || find /tmp/ps3tools -maxdepth 3
-
-      - name: Verificar arquivos e chaves do projeto
-        run: |
-          ls -la data/ || true
-          ls -la release/ || true
+          which ppu-gcc || find /usr/local/ps3dev -name "*gcc*"
+          git clone --depth 1 https://github.com /tmp/ps3sce
+          make -C /tmp/ps3sce
+          ls -la data/ release/ src/
