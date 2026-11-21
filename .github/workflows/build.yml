@@ -10,20 +10,28 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: ps3dev/ps3dev:latest
     steps:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Instalar dependencias e scetool
+      - name: Compilar DS45Pad
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential git wget unzip libssl-dev zlib1g-dev libgmp-dev
-          git clone --depth 1 https://github.com /tmp/scetool
-          make -C /tmp/scetool
-
-      - name: Listar pastas do projeto
-        run: |
+          export CELL_SDK=/usr/local/ps3dev
+          export PATH=$PATH:/usr/local/ps3dev/bin:/usr/local/ps3dev/ppu/bin
           ls -la
           ls -la data/ || true
           ls -la release/ || true
-          ls -la /tmp/scetool/
+          cd src && make all-builds || true
+          ls -la src/
+
+      - name: Enviar arquivos gerados
+        uses: actions/upload-artifact@v4
+        with:
+          name: DS45Pad-SixaxisMod
+          path: |
+            src/*.sprx
+            src/*.elf
+            release/*
+          if-no-files-found: warn
