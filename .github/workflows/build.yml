@@ -22,12 +22,33 @@ jobs:
           export PATH=$PATH:$PS3DEV/bin:$PS3DEV/ppu/bin
           mkdir -p /tmp/inc/cell /tmp/inc/sys
 
-          printf '#include <stdint.h>\n#define CELL_PAD_OK 0\n#define CELL_PAD_MAX_PORT_NUM 7\n#define CELL_PAD_MAX_CODES 64\n#define CELL_PAD_STATUS_DISCONNECTED 0\n#define CELL_PAD_STATUS_CONNECTED 1\n#define CELL_PAD_ERROR_UNINITIALIZED 0x80121104\n#define CELL_PAD_ERROR_NO_DEVICE 0x80121107\n#define CELL_PAD_CAPABILITY_PS3_CONFORMITY 1\n#define CELL_PAD_CAPABILITY_PRESS_MODE 2\n#define CELL_PAD_CAPABILITY_SENSOR_MODE 4\n#define CELL_PAD_CAPABILITY_HP_ANALOG_STICK 8\n#define CELL_PAD_CAPABILITY_ACTUATOR 16\ntypedef struct { int32_t len; uint16_t button[64]; } CellPadData;\ntypedef struct { uint32_t max_connect, now_connect, system_info, port_status[7], port_setting[7], device_capability[7], device_type[7]; } CellPadInfo2;\ntypedef struct { uint8_t motor, reserved; } CellPadActParam;\nint32_t cellPadGetData(uint32_t, CellPadData*);\nint32_t cellPadGetDataExtra(uint32_t, uint32_t*, CellPadData*);\nint32_t cellPadGetInfo2(CellPadInfo2*);\nint32_t cellPadSetActDirect(uint32_t, CellPadActParam*);\nint32_t cellPadSetPortSetting(uint32_t, uint32_t);\n' > /tmp/inc/cell/pad.h
+          python3 -c '
+          open("/tmp/inc/cell/pad.h","w").write("""#include <stdint.h>
+          #define CELL_PAD_OK 0
+          #define CELL_PAD_MAX_PORT_NUM 7
+          #define CELL_PAD_MAX_CODES 64
+          #define CELL_PAD_STATUS_DISCONNECTED 0
+          #define CELL_PAD_STATUS_CONNECTED 1
+          #define CELL_PAD_ERROR_UNINITIALIZED 0x80121104
+          #define CELL_PAD_ERROR_NO_DEVICE 0x80121107
+          #define CELL_PAD_CAPABILITY_PS3_CONFORMITY 1
+          #define CELL_PAD_CAPABILITY_PRESS_MODE 2
+          #define CELL_PAD_CAPABILITY_SENSOR_MODE 4
+          #define CELL_PAD_CAPABILITY_HP_ANALOG_STICK 8
+          #define CELL_PAD_CAPABILITY_ACTUATOR 16
+          typedef struct { int32_t len; uint16_t button""" + chr(91) + "64" + chr(93) + """; } CellPadData;
+          typedef struct { uint32_t max_connect, now_connect, system_info, port_status""" + chr(91) + "7" + chr(93) + """, port_setting""" + chr(91) + "7" + chr(93) + """, device_capability""" + chr(91) + "7" + chr(93) + """, device_type""" + chr(91) + "7" + chr(93) + """; } CellPadInfo2;
+          typedef struct { uint8_t motor, reserved; } CellPadActParam;
+          int32_t cellPadGetData(uint32_t, CellPadData*);
+          int32_t cellPadGetDataExtra(uint32_t, uint32_t*, CellPadData*);
+          int32_t cellPadGetInfo2(CellPadInfo2*);
+          int32_t cellPadSetActDirect(uint32_t, CellPadActParam*);
+          int32_t cellPadSetPortSetting(uint32_t, uint32_t);
+          """)
+          '
 
           printf '#include <stdint.h>\n#define CELL_FS_O_RDONLY 0\n#define CELL_FS_O_WRONLY 1\n#define CELL_FS_O_RDWR 2\n#define CELL_FS_O_CREAT 0100\n#define CELL_FS_O_TRUNC 01000\n#define CELL_FS_O_APPEND 02000\n#define CELL_FS_SUCCEEDED 0\nint cellFsOpen(const char*, int, int*, const void*, uint64_t);\nint cellFsRead(int, void*, uint64_t, uint64_t*);\nint cellFsWrite(int, const void*, uint64_t, uint64_t*);\nint cellFsClose(int);\n' > /tmp/inc/cell/cell_fs.h
-
           printf '#include <stdint.h>\n#define CELL_USBD_PROBE_SUCCEEDED 0\n#define CELL_USBD_PROBE_FAILED -1\n#define CELL_USBD_ATTACH_SUCCEEDED 0\n#define CELL_USBD_ATTACH_FAILED -1\n#define CELL_USBD_DETACH_SUCCEEDED 0\n#define CELL_USBD_DETACH_FAILED -1\n#define USB_DESCRIPTOR_TYPE_DEVICE 1\n#define USB_DESCRIPTOR_TYPE_CONFIGURATION 2\n#define USB_DESCRIPTOR_TYPE_INTERFACE 4\n#define USB_DESCRIPTOR_TYPE_ENDPOINT 5\n#define USB_DESCRIPTOR_TYPE_HID 0x21\n#define USB_DESCRIPTOR_TYPE_REPORT 0x22\ntypedef struct { uint8_t bLength, bDescriptorType; uint16_t bcdUSB; uint8_t bDeviceClass, bDeviceSubClass, bDeviceProtocol, bMaxPacketSize0; uint16_t idVendor, idProduct, bcdDevice; uint8_t iManufacturer, iProduct, iSerialNumber, bNumConfigurations; } UsbDeviceDescriptor;\ntypedef UsbDeviceDescriptor CellUsbdDeviceDescriptor;\ntypedef struct { uint8_t bLength, bDescriptorType; uint16_t wTotalLength; uint8_t bNumInterfaces, bConfigurationValue, iConfiguration, bmAttributes, MaxPower; } UsbConfigurationDescriptor;\ntypedef struct { uint8_t bLength, bDescriptorType, bInterfaceNumber, bAlternateSetting, bNumEndpoints, bInterfaceClass, bInterfaceSubClass, bInterfaceProtocol, iInterface; } UsbInterfaceDescriptor;\ntypedef struct { uint8_t bLength, bDescriptorType, bEndpointAddress, bmAttributes; uint16_t wMaxPacketSize; uint8_t bInterval; } UsbEndpointDescriptor;\ntypedef UsbEndpointDescriptor CellUsbdEndpointDescriptor;\ntypedef struct { const char *name; int (*probe)(int); int (*attach)(int); int (*detach)(int); } CellUsbdLddOps;\ntypedef void (*CellUsbdDoneCallback)(int32_t, int32_t, void*);\nint32_t cellUsbdInit(void);\nint32_t cellUsbdEnd(void);\nint32_t cellUsbdRegisterLdd(CellUsbdLddOps*);\nint32_t cellUsbdUnregisterLdd(CellUsbdLddOps*);\nvoid *cellUsbdScanStaticDescriptor(int32_t, void*, uint8_t);\nint32_t cellUsbdOpenPipe(int32_t, void*);\nint32_t cellUsbdClosePipe(int32_t);\nint32_t cellUsbdControlTransfer(int32_t, void*, void*, CellUsbdDoneCallback, void*);\nint32_t cellUsbdInterruptTransfer(int32_t, void*, uint32_t, CellUsbdDoneCallback, void*);\n' > /tmp/inc/cell/usbd.h
-
           printf '#include <stdint.h>\ntypedef uint64_t sys_ppu_thread_t;\n#define SYS_PPU_THREAD_CREATE_JOINABLE 1\nint sys_ppu_thread_create(sys_ppu_thread_t*, void (*)(uint64_t), uint64_t, int, uint64_t, uint64_t, const char*);\nvoid sys_ppu_thread_exit(uint64_t);\nint sys_ppu_thread_join(sys_ppu_thread_t, uint64_t*);\n' > /tmp/inc/sys/ppu_thread.h
           printf '#include <stdint.h>\nint sys_timer_usleep(uint64_t);\nint sys_timer_sleep(unsigned int);\n' > /tmp/inc/sys/timer.h
           printf '#include <stdint.h>\n#define SYS_PROCESS_PRIMARY_STACK_SIZE_64K 0x10000\n#define SYS_PROCESS_PARAM(p, s)\ntypedef int32_t sys_pid_t;\nsys_pid_t sys_process_getpid(void);\n' > /tmp/inc/sys/process.h
