@@ -120,6 +120,35 @@ static void correct_sticks(uint32_t port_no, CellPadData *data)
 	data->button[DS45_BTN_ANALOG_LEFT_Y]  = ly;
 	data->button[DS45_BTN_ANALOG_RIGHT_X] = rx;
 	data->button[DS45_BTN_ANALOG_RIGHT_Y] = ry;
+    /* --- INICIO: EMULACAO SIXAXIS PELO ANALOGICO DIREITO (L1 + R1 + SELECT) --- */
+    static int sixaxis_emu_on = 0;
+    static int combo_held = 0;
+    int l1 = (data->button[DS45_BTN_DIGITAL2] & (1 << 2)) != 0;
+    int r1 = (data->button[DS45_BTN_DIGITAL2] & (1 << 3)) != 0;
+    int sel = (data->button[DS45_BTN_DIGITAL1] & (1 << 0)) != 0;
+
+    if (l1 && r1 && sel) {
+        if (!combo_held) {
+            sixaxis_emu_on = !sixaxis_emu_on;
+            combo_held = 1;
+        }
+    } else {
+        combo_held = 0;
+    }
+
+    if (sixaxis_emu_on) {
+        if (data->len < DS45_PAD_LEN)
+            data->len = DS45_PAD_LEN;
+
+        data->button[DS45_BTN_SENSOR_X] = (uint16_t)(rx * 4);
+        data->button[DS45_BTN_SENSOR_Y] = (uint16_t)(ry * 4);
+        data->button[DS45_BTN_SENSOR_Z] = (uint16_t)(512 + ((128 - (int)ry) * 2));
+        data->button[DS45_BTN_SENSOR_G] = (uint16_t)(rx * 4);
+
+        data->button[DS45_BTN_ANALOG_RIGHT_X] = 128;
+        data->button[DS45_BTN_ANALOG_RIGHT_Y] = 128;
+    }
+    /* --- FIM: EMULACAO SIXAXIS --- */
 
 	/* Right stick only: that is where the reported dead sector is, and
 	 * logging both would halve the useful sample rate for no reason. */
