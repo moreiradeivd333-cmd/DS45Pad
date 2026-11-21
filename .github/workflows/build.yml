@@ -16,11 +16,11 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Criar headers minimos Cell SDK e compilar
+      - name: Criar headers Cell SDK e compilar
         run: |
           export PS3DEV=/usr/local/ps3dev
           export PATH=$PATH:$PS3DEV/bin:$PS3DEV/ppu/bin
-          mkdir -p /tmp/cell_inc/cell
+          mkdir -p /tmp/cell_inc/cell /tmp/cell_inc/sys
 
           cat << 'EOF' > /tmp/cell_inc/cell/pad.h
           #ifndef _CELL_PAD_H_
@@ -109,10 +109,71 @@ jobs:
           #endif
           EOF
 
+          cat << 'EOF' > /tmp/cell_inc/sys/ppu_thread.h
+          #ifndef _SYS_PPU_THREAD_H_
+          #define _SYS_PPU_THREAD_H_
+          #include <stdint.h>
+          typedef uint64_t sys_ppu_thread_t;
+          #define SYS_PPU_THREAD_CREATE_JOINABLE 0x00000001
+          int sys_ppu_thread_create(sys_ppu_thread_t *thread_id, void (*entry)(uint64_t), uint64_t arg, int prio, uint64_t stacksize, uint64_t flags, const char *threadname);
+          void sys_ppu_thread_exit(uint64_t val);
+          int sys_ppu_thread_join(sys_ppu_thread_t thread_id, uint64_t *vptr);
+          #endif
+          EOF
+
+          cat << 'EOF' > /tmp/cell_inc/sys/timer.h
+          #ifndef _SYS_TIMER_H_
+          #define _SYS_TIMER_H_
+          #include <stdint.h>
+          int sys_timer_usleep(uint64_t useconds);
+          int sys_timer_sleep(unsigned int seconds);
+          #endif
+          EOF
+
+          cat << 'EOF' > /tmp/cell_inc/sys/process.h
+          #ifndef _SYS_PROCESS_H_
+          #define _SYS_PROCESS_H_
+          #include <stdint.h>
+          #define SYS_PROCESS_PRIMARY_STACK_SIZE_64K 0x10000
+          #define SYS_PROCESS_PARAM(prio, stacksize)
+          typedef int32_t sys_pid_t;
+          sys_pid_t sys_process_getpid(void);
+          #endif
+          EOF
+
+          cat << 'EOF' > /tmp/cell_inc/sys/prx.h
+          #ifndef _SYS_PRX_H_
+          #define _SYS_PRX_H_
+          #include <stdint.h>
+          typedef int32_t sys_prx_id_t;
+          #define SYS_PRX_RESIDENT 0
+          #define SYS_PRX_NO_RESIDENT 1
+          #define SYS_MODULE_INFO(name, attr, major, minor)
+          #define SYS_MODULE_START(func)
+          #define SYS_MODULE_STOP(func)
+          #define SYS_LIB_DECLARE_WITH_STUB(libname, attr, stubname)
+          #define SYS_LIB_EXPORT(func, libname)
+          #endif
+          EOF
+
+          cat << 'EOF' > /tmp/cell_inc/sys/synchronization.h
+          #ifndef _SYS_SYNCHRONIZATION_H_
+          #define _SYS_SYNCHRONIZATION_H_
+          #include <stdint.h>
+          typedef struct { uint64_t lock_var; uint32_t attribute; uint32_t recursive_count; uint32_t sleep_queue; uint32_t pad; } sys_lwmutex_t;
+          typedef struct { uint32_t attr_protocol; uint32_t attr_recursive; char name[8]; } sys_lwmutex_attribute_t;
+          #define SYS_SYNC_PRIORITY 1
+          #define SYS_SYNC_NOT_RECURSIVE 0x20
+          #define sys_lwmutex_attribute_initialize(attr) do { (attr).attr_protocol = SYS_SYNC_PRIORITY; (attr).attr_recursive = SYS_SYNC_NOT_RECURSIVE; } while(0)
+          int sys_lwmutex_create(sys_lwmutex_t *lwmutex, const sys_lwmutex_attribute_t *attr);
+          int sys_lwmutex_destroy(sys_lwmutex_t *lwmutex);
+          int sys_lwmutex_lock(sys_lwmutex_t *lwmutex, uint64_t timeout);
+          int sys_lwmutex_unlock(sys_lwmutex_t *lwmutex);
+          #endif
+          EOF
+
           cd src
-          PSL_INC=$(find /usr/local/ps3dev -name "ppu_thread.h" | head -n 1 | xargs dirname | xargs dirname)
-          echo "PSL_INC=$PSL_INC"
-          CFLAGS="-O2 -m32 -ffunction-sections -fdata-sections -nodefaultlibs -std=gnu99 -Wall -Wno-unused-function -I. -I/tmp/cell_inc -I$PSL_INC -I$PS3DEV/ppu/include"
+          CFLAGS="-O2 -m32 -ffunction-sections -fdata-sections -nodefaultlibs -std=gnu99 -Wall -Wno-unused-function -I. -I/tmp/cell_inc -I$PS3DEV/ppu/include"
           LDFLAGS="-m32 -L$PS3DEV/ppu/lib -Wl,--gc-sections"
           powerpc64-ps3-elf-gcc $CFLAGS $LDFLAGS -o ds45pad_vsh.elf libc.c util.c hook.c config.c ds4.c dualsense.c gamehook.c usb.c passthru.c diag.c main.c -lusbd_stub -lio_stub -lfs_stub -lsysmodule_stub -lsysutil_stub || true
           ls -la
