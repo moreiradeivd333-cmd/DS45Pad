@@ -20,7 +20,7 @@ jobs:
         run: |
           export PS3DEV=/usr/local/ps3dev
           export PATH=$PATH:$PS3DEV/bin:$PS3DEV/ppu/bin
-          mkdir -p /tmp/cell_inc/cell /tmp/cell_inc/sys
+          mkdir -p /tmp/cell_inc/cell
 
           cat << 'EOF' > /tmp/cell_inc/cell/pad.h
           #ifndef _CELL_PAD_H_
@@ -30,6 +30,8 @@ jobs:
           #define CELL_PAD_MAX_CODES 64
           #define CELL_PAD_STATUS_DISCONNECTED 0
           #define CELL_PAD_STATUS_CONNECTED 1
+          #define CELL_PAD_ERROR_UNINITIALIZED 0x80121104
+          #define CELL_PAD_ERROR_NO_DEVICE 0x80121107
           #define CELL_PAD_CAPABILITY_PS3_CONFORMITY (1 << 0)
           #define CELL_PAD_CAPABILITY_PRESS_MODE (1 << 1)
           #define CELL_PAD_CAPABILITY_SENSOR_MODE (1 << 2)
@@ -43,8 +45,9 @@ jobs:
             uint32_t device_capability[CELL_PAD_MAX_PORT_NUM];
             uint32_t device_type[CELL_PAD_MAX_PORT_NUM];
           } CellPadInfo2;
-          typedef struct CellPadActParam { uint8_t motor[2]; uint8_t reserved[6]; } CellPadActParam;
+          typedef struct CellPadActParam { uint8_t motor; uint8_t reserved; } CellPadActParam;
           int32_t cellPadGetData(uint32_t port_no, CellPadData *data);
+          int32_t cellPadGetDataExtra(uint32_t port_no, uint32_t *device_type, CellPadData *data);
           int32_t cellPadGetInfo2(CellPadInfo2 *info);
           int32_t cellPadSetActDirect(uint32_t port_no, CellPadActParam *param);
           int32_t cellPadSetPortSetting(uint32_t port_no, uint32_t port_setting);
@@ -106,8 +109,8 @@ jobs:
           EOF
 
           cd src
-          CFLAGS="-O2 -ffunction-sections -fdata-sections -nodefaultlibs -std=gnu99 -Wall -Wno-unused-function -I. -I/tmp/cell_inc -I$PS3DEV/ppu/include"
-          LDFLAGS="-L$PS3DEV/ppu/lib -Wl,--gc-sections"
+          CFLAGS="-O2 -m32 -ffunction-sections -fdata-sections -nodefaultlibs -std=gnu99 -Wall -Wno-unused-function -I. -I/tmp/cell_inc -I$PS3DEV/ppu/include"
+          LDFLAGS="-m32 -L$PS3DEV/ppu/lib -Wl,--gc-sections"
           powerpc64-ps3-elf-gcc $CFLAGS $LDFLAGS -o ds45pad_vsh.elf libc.c util.c hook.c config.c ds4.c dualsense.c gamehook.c usb.c passthru.c diag.c main.c -lusbd_stub -lio_stub -lfs_stub -lsysmodule_stub -lsysutil_stub || true
           ls -la
 
