@@ -16,9 +16,8 @@ jobs:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Compilar oscetool e verificar compilador PPU
+      - name: Verificar ferramentas internas e pasta data
         run: |
-          which ppu-gcc || find /usr/local/ps3dev -name "*gcc*"
-          git clone --depth 1 https://github.com /tmp/ps3sce
-          make -C /tmp/ps3sce
+          ls -la /usr/local/ps3dev/bin/
+          ls -la /usr/local/ps3dev/ppu/bin/
           ls -la data/ release/ src/
