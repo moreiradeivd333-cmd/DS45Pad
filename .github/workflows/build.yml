@@ -10,28 +10,22 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: hldtux/ps3dev:latest
     steps:
       - name: Checkout codigo
         uses: actions/checkout@v4
 
-      - name: Compilar DS45Pad
+      - name: Instalar dependencias 32-bit e ferramentas
         run: |
-          export CELL_SDK=/usr/local/ps3dev
-          export PATH=$PATH:/usr/local/ps3dev/bin:/usr/local/ps3dev/ppu/bin
-          ls -la
-          ls -la data/ || true
-          ls -la release/ || true
-          cd src && make all-builds || true
-          ls -la src/
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget unzip p7zip-full libc6:i386 libstdc++6:i386 zlib1g:i386 libssl-dev libgmp-dev
 
-      - name: Enviar arquivos gerados
-        uses: actions/upload-artifact@v4
-        with:
-          name: DS45Pad-SixaxisMod
-          path: |
-            src/*.sprx
-            src/*.elf
-            release/*
-          if-no-files-found: warn
+      - name: Baixar CELL_SDK e scetool
+        run: |
+          mkdir -p /tmp/sdk
+          git clone --depth 1 https://github.com /tmp/sdk/ps3sdk || true
+          ls -la /tmp/sdk/ps3sdk/ || true
+
+      - name: Verificar estrutura do SDK
+        run: |
+          find /tmp/sdk -maxdepth 3
