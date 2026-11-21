@@ -1,0 +1,29 @@
+name: Build DS45Pad PS3HEN
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'src/**'
+      - '.github/workflows/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout codigo
+        uses: actions/checkout@v4
+
+      - name: Baixar PS3 SDK e scetool
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git wget unzip libssl-dev zlib1g-dev
+          mkdir -p /tmp/ps3
+          git clone --depth 1 https://github.com /tmp/scetool
+          make -C /tmp/scetool
+
+      - name: Verificar arquivos do projeto
+        run: |
+          ls -la
+          ls -la data/ || true
+          ls -la release/ || true
